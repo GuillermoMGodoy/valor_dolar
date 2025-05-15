@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dólar Oficial Argentina</title>
+    <style>
+        /* New Color Palette */
+        :root {
+            --fondo-principal: #0B1F3A;
+            /* Azul marino oscuro */
+            --color-secundario: #2C6E49;
+            /* Verde petróleo suave */
+            --texto-principal: #E5E5E5;
+            /* Gris claro */
+            --titulos-destacados: #FFFFFF;
+            /* Blanco puro */
+            --botones-enlaces: #0ee02a;
+            /* Verde dólar */
+            --color-error: #c0392b;
+            /* Rojo para errores (kept) */
+            --color-loading: #3498db;
+            /* Azul para carga (kept) */
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: var(--fondo-principal);
+            color: var(--texto-principal);
+            /* Texto principal por defecto */
+            text-align: center;
+        }
+
+        .container {
+            background-color: var(--color-secundario);
+            padding: 30px 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            /* Slightly more visible shadow */
+            width: 90%;
+            max-width: 500px;
+            /* Max width for better readability on large screens */
+        }
+
+        #greeting-container {
+            margin-bottom: 25px;
+            font-size: 1.6em;
+            font-weight: bold;
+            color: var(--titulos-destacados);
+            /* Títulos y destacados */
+        }
+
+        #greeting-icon {
+            margin-right: 10px;
+            font-size: 1.3em;
+            /* Emojis have their own colors, so no specific color needed here unless using font icons */
+        }
+
+        /* Previous greeting color classes are no longer needed for text color
+           but JS still adds them, could be used for other styling if desired. */
+
+        h1 {
+            color: var(--titulos-destacados);
+            /* Títulos y destacados */
+            margin-bottom: 15px;
+            font-size: 1.8em;
+        }
+
+        .rate-display {
+            font-size: 2.8em;
+            /* Slightly larger for emphasis */
+            font-weight: bold;
+            color: var(--botones-enlaces);
+            /* Verde dólar (as a highlight color for the rate) */
+            margin: 20px 0;
+            background-color: rgba(255, 255, 255, 0.05);
+            /* Subtle background for rate display */
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .rate-display .currency {
+            font-size: 0.6em;
+            color: var(--texto-principal);
+            /* Consistent with other text */
+            opacity: 0.8;
+            /* Slightly less prominent */
+        }
+
+        .last-updated {
+            font-size: 0.9em;
+            color: var(--texto-principal);
+            opacity: 0.9;
+            margin-top: 20px;
+        }
+
+        .error-message {
+            color: var(--color-error);
+            background-color: rgba(255, 0, 0, 0.1);
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+
+        .loading-message {
+            font-size: 1.2em;
+            color: var(--color-loading);
+            margin: 20px 0;
+            /* Centered better when rate is hidden */
+        }
+
+        a {
+            color: var(--botones-enlaces);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+            opacity: 0.8;
+        }
+
+        .attribution {
+            font-size: 0.8em;
+            margin-top: 30px;
+            color: var(--texto-principal);
+            opacity: 0.7;
+        }
+
+        .attribution a {
+            color: var(--botones-enlaces);
+            /* Explicitly set for this link too */
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div id="greeting-container">
+            <span id="greeting-icon"></span><span id="greeting-text"></span>
+        </div>
+
+        <h1>Valor del Dólar Oficial en Argentina</h1>
+        <div id="rate-container">
+            <p class="loading-message">Cargando cotización...</p>
+            <div class="rate-display" style="display: none;">
+                1 USD = <span id="official-dollar-value">---</span> <span class="currency">ARS</span>
+            </div>
+        </div>
+        <p id="last-updated" class="last-updated"></p>
+        <p id="error-message" class="error-message" style="display: none;"></p>
+        <p class="attribution">
+            Pagina Realizada por <a href="https://www.instagram.com/gg_soluciones_digitales/" target="_blank"
+                rel="noopener noreferrer">G&G Soluciones Digitales</a>
+        </p>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const apiKey = 'afe2e5407d3a0daf18abd4a4'; // Your API Key
+        const baseCurrency = 'USD';
+        const targetCurrency = 'ARS';
+        const apiUrl = `https://v6.exchangerate-api.com/v6/${apiKey}/latest/${baseCurrency}`;
+        const userName = "Gabriel Candela";
+        const argentinaTimeZone = 'America/Argentina/Buenos_Aires';
+
+        // --- DOM Elements ---
+        const dollarValueElement = document.getElementById('official-dollar-value');
+        const lastUpdatedElement = document.getElementById('last-updated');
+        const errorMessageElement = document.getElementById('error-message');
+        const rateDisplayElement = document.querySelector('.rate-display');
+        const loadingMessageElement = document.querySelector('.loading-message');
+        const greetingIconElement = document.getElementById('greeting-icon');
+        const greetingTextElement = document.getElementById('greeting-text');
+        // const greetingContainerElement = document.getElementById('greeting-container'); // Not strictly needed for class changes now
+
+        // --- Greeting Function ---
+        function updateGreeting() {
+            try {
+                const now = new Date();
+                const options = { timeZone: argentinaTimeZone, hour: '2-digit', hour12: false };
+                const argentinaHourString = now.toLocaleTimeString('en-US', options);
+                const argentinaHour = parseInt(argentinaHourString === "24" ? "00" : argentinaHourString, 10);
+
+                let greeting = "";
+                let icon = "";
+                // The greetingClass variable is no longer used to change text color via CSS
+                // but JavaScript will still add them if you want to use them for other purposes (e.g. icon changes)
+                // let greetingClass = "";
+
+                if (argentinaHour >= 0 && argentinaHour <= 11) {
+                    greeting = `Buenos Días ${userName}`;
+                    icon = "☀️"; // Sun
+                    // greetingClass = "greeting-morning";
+                } else if (argentinaHour >= 12 && argentinaHour <= 19) {
+                    greeting = `Buenas Tardes ${userName}`;
+                    icon = "🌇"; // Sunset/Cityscape
+                    // greetingClass = "greeting-afternoon";
+                } else { // 20:00 to 23:59
+                    greeting = `Buenas Noches ${userName}`;
+                    icon = "🌙"; // Moon
+                    // greetingClass = "greeting-night";
+                }
+
+                greetingIconElement.textContent = icon;
+                greetingTextElement.textContent = greeting;
+
+                // No longer changing color via these classes directly on the container for text
+                // greetingContainerElement.classList.remove('greeting-morning', 'greeting-afternoon', 'greeting-night');
+                // greetingContainerElement.classList.add(greetingClass);
+
+            } catch (error) {
+                console.error("Error updating greeting:", error);
+                greetingTextElement.textContent = `Hola ${userName}`;
+                greetingIconElement.textContent = "👋";
+            }
+        }
+
+
+        // --- Exchange Rate Function ---
+        async function fetchDollarRate() {
+            loadingMessageElement.style.display = 'block';
+            rateDisplayElement.style.display = 'none';
+            errorMessageElement.style.display = 'none';
+            lastUpdatedElement.textContent = '';
+
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    let errorMsg = `Error ${response.status}: ${response.statusText}`;
+                    if (errorData && errorData['error-type']) {
+                        errorMsg += ` - API Error: ${errorData['error-type']}`;
+                        if (errorData['error-type'] === 'invalid-key') {
+                            errorMsg += ". Por favor, verifica tu API Key.";
+                        } else if (errorData['error-type'] === 'inactive-account') {
+                            errorMsg += ". Tu cuenta de API está inactiva.";
+                        } else if (errorData['error-type'] === 'quota-reached') {
+                            errorMsg += ". Has alcanzado la cuota de solicitudes de la API.";
+                        }
+                    }
+                    throw new Error(errorMsg);
+                }
+
+                const data = await response.json();
+
+                if (data.result === 'success' && data.conversion_rates && data.conversion_rates[targetCurrency]) {
+                    const rate = data.conversion_rates[targetCurrency];
+                    dollarValueElement.textContent = rate.toFixed(2);
+
+                    let updateTime;
+                    if (data.time_last_update_unix) {
+                        updateTime = new Date(data.time_last_update_unix * 1000);
+                    } else {
+                        updateTime = new Date();
+                    }
+                    lastUpdatedElement.textContent = `Última actualización: ${updateTime.toLocaleString('es-AR', { dateStyle: 'medium', timeStyle: 'medium' })}`;
+
+                    rateDisplayElement.style.display = 'block';
+                    loadingMessageElement.style.display = 'none';
+                    errorMessageElement.style.display = 'none';
+
+                } else {
+                    throw new Error(data['error-type'] || 'No se pudo obtener la cotización del ARS.');
+                }
+
+            } catch (error) {
+                console.error('Error fetching exchange rate:', error);
+                errorMessageElement.textContent = `Error al obtener la cotización: ${error.message}`;
+                errorMessageElement.style.display = 'block';
+                loadingMessageElement.style.display = 'none';
+                rateDisplayElement.style.display = 'none';
+            }
+        }
+
+        // --- Initial Calls & Intervals ---
+        updateGreeting();
+        fetchDollarRate();
+
+        setInterval(updateGreeting, 60000); // Update greeting every minute
+
+        const DOLLAR_UPDATE_INTERVAL_MS = 3600000; // 1 hour
+        setInterval(fetchDollarRate, DOLLAR_UPDATE_INTERVAL_MS);
+    </script>
+</body>
+
+</html>
